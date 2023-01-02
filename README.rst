@@ -51,8 +51,12 @@ Przesył pakietów CoAP można śledzić używając wiresharka. Wybrać interfej
 
 Po spełnieniu powyższych warunków można przetestować działanie wysyłając nastepujące zapytania terminalem:
 
-coap-client -m put -e 1 coap://192.168.2.169/led     zapytanie służy do zapalania diody led, aby ją zgasić zależy wpisać 0 zamiast 1.
+coap-client -m put -e 1 coap://192.168.2.169/led     
 
-coap-client -m get -s <czas> coap://192.168.2.169/obs  zapytanie do oberwacji zmieniającej się wartości.
+zapytanie służy do zapalania diody led, aby ją zgasić zależy wpisać 0 zamiast 1.
+
+coap-client -m get -s <czas> coap://192.168.2.169/obs  
+
+zapytanie do oberwacji zmieniającej się wartości.
 
 Adres IP był ustwiony pod mój setup ale można to w prosty sposób zmienić w pliku prj.conf

@@ -664,7 +664,7 @@ void main(void)
 		}
 	}
 
-	LOG_DBG("Done");
+	LOG_DBG("Done"); 
 	return;
 
 quit:
