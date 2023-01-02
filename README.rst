@@ -6,51 +6,53 @@ CoAP Server
 Overview
 ********
 
-This sample is a simple CoAP server showing how to expose a simple resource.
+Testowy program do serwera CoAP dla drona ROV1.
 
-This demo assumes that the platform of choice has networking support,
-some adjustments to the configuration may be needed.
+Program zawiera 2 rodzaje zapytania:
+/led metodą PUT można podając na payload 1 albo 0 zapalać i gasić diodę led (pisane z myślą o nucleo-f207zg ale powinno dać się wgrać na każdy inny devboard z ethernetem),
+/obs metodą GET z subskrypcją. przykład wysyła zwiększający sie licznik. Dane można wysyłać bardzo szybko i powinno się idealnie nadać do naszego zastosoania.
 
-The sample will listen for requests in the CoAP UDP port (5683) in the
-site-local IPv6 multicast address reserved for CoAP nodes.
+Najprawdopodobniej używając tych dwóch metod możemy bez problemu sterować ROV1. Da się obserwować parę rzeczy na raz a do tego wysyłać inne zapytania i wygląda na to, że wszystko funkcjonuje jak należy.
 
-The sample exports the following resources:
+Do zrobienia:
+- przykład sprawnego klienta do tesów,
+- komunikacja CAN,
+- sprawdzić co się stanie pod odpięciu internetu,
+- sprawdzić czy da się subskrybowac bezterminowo
 
-.. code-block:: none
-
-   /test
-   /seg1/seg2/seg3
-   /query
-   /separate
-   /large
-   /location-query
-   /large-update
-
-These resources allow a good part of the ETSI test cases to be run
-against coap-server.
 
 Building And Running
 ********************
 
-This project has no output in case of success, the correct
-functionality can be verified by using some external tool such as tcpdump
-or wireshark.
+Przykład był pisany z myślą o nucleo-f207zg ale powinien zadziałać na każdym devboardzie obsługującym ethernet lub wifi (możliwa potrzebna dodatkowa konfiguracja w przypadku wifi)
 
-See the `net-tools`_ project for more details
+W katalogu głównym zephyra otworzyć terminal następnie wpisać:
 
-This sample can be built and executed on QEMU or native_posix board as
-described in :ref:`networking_with_host`.
+source ~/zephyrproject/.venv/bin/activate
 
-Use this command on the host to run the `libcoap`_ implementation of
-the ETSI test cases:
+west build --pristine -b <nazwa używanej płytki> <ścieżka do przykładu>
 
-.. code-block:: console
+west flash
 
-   sudo ./examples/etsi_coaptest.sh -i tap0 2001:db8::1
+Do zaobserwowania przykładu potrzebny jest klient CoAP w moim przypadku używałem libcoap pod Ubuntu
+Proces instalacji:
 
-To build the version supporting the TI CC2520 radio, use the supplied
-prj_cc2520.conf configuration file enabling IEEE 802.15.4.
+https://libcoap.net/install.html
 
-.. _`net-tools`: https://github.com/zephyrproject-rtos/net-tools
+w przypadku jetsona, który domyślnie ma starszą wersję systemu wystarczy wpisać w terminal:
 
-.. _`libcoap`: https://github.com/obgm/libcoap
+sudo apt install libcoap-1-0-bin
+
+Potrzebny jest jeszcze program do komunikacji przez UART do obserwowania zachowania mikrokontrolera. W moim przypadku używałem minicom
+
+minicom -b 115200 -D /dev/ttyACM0      - dla nucleo-f207zg
+
+Przesył pakietów CoAP można śledzić używając wiresharka. Wybrać interfejs siecziowy do którego klient i serwer są połączone a potem dla przejrzystości w filtrowaniu wpisać CoAP
+
+Po spełnieniu powyższych warunków można przetestować działanie wysyłając nastepujące zapytania terminalem:
+
+coap-client -m put -e 1 coap://192.168.2.169/led     zapytanie służy do zapalania diody led, aby ją zgasić zależy wpisać 0 zamiast 1.
+
+coap-client -m get -s <czas> coap://192.168.2.169/obs  zapytanie do oberwacji zmieniającej się wartości.
+
+Adres IP był ustwiony pod mój setup ale można to w prosty sposób zmienić w pliku prj.conf
