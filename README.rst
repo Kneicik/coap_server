@@ -15,8 +15,8 @@ Program zawiera 2 rodzaje zapytania:
 Najprawdopodobniej używając tych dwóch metod możemy bez problemu sterować ROV1. Da się obserwować parę rzeczy na raz a do tego wysyłać inne zapytania i wygląda na to, że wszystko funkcjonuje jak należy.
 
 Do zrobienia:
-- przykład sprawnego klienta do tesów,
-- komunikacja CAN,
+- przykład sprawnego klienta do tesów, - gotowe
+- komunikacja CAN,                     - gotowe
 - sprawdzić czy da się subskrybowac bezterminowo
 
 

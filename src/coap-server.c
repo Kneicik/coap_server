@@ -54,6 +54,55 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 #define NUM_PENDINGS 10
 
+// Do obsługi przerwań
+#define STACKSIZE KB(2)
+
+#define PRIORITY 7
+
+// CAN bus
+
+struct can_frame frame = {
+        .id = 0x010,
+        .dlc = 8,
+};
+
+const struct can_filter my_filter = {
+		.flags = CAN_FILTER_DATA,
+        .id = 0x123,
+};
+
+CAN_MSGQ_DEFINE(my_can_msgq, 2);
+struct can_frame rx_frame;
+int filter_id;
+int rx;
+
+const struct device *const can_dev = DEVICE_DT_GET(DT_CHOSEN(zephyr_canbus));
+int ret;
+
+void receive(){
+	can_start(can_dev);
+while(1){
+  filter_id = can_add_rx_filter_msgq(can_dev, &my_can_msgq, &my_filter);
+  if (filter_id < 0) {
+    printk("Unable to add rx msgq [%d]", filter_id);
+    return;
+  }
+  k_msgq_get(&my_can_msgq, &rx_frame, K_FOREVER);
+  printk("ramka: %d \n", rx_frame.data[0]);
+}
+}
+
+void send_can(int data)
+{
+	data = data-48;
+  can_start(can_dev);
+  	frame.data[0] = data;
+    ret = can_send(can_dev, &frame, K_MSEC(100), NULL, NULL);
+    if (ret != 0) {
+            printk("Wysłanie pakietu CAN nie działa [%d]", ret);
+    }
+}
+
 /* CoAP socket fd */
 static int sock;
 
@@ -169,7 +218,9 @@ static int led_put(struct coap_resource *resource,
 	if (payload) {
 		net_hexdump("PUT Payload", payload, payload_len);
 	}
+	send_can(*payload);
 	if (*payload == 49){
+
 		printk("payload: %d\n %d\n",*payload,payload_len);
 	if (!device_is_ready(led.port)) {
 		return ret;
@@ -263,7 +314,6 @@ static void retransmit_request(struct k_work *work)
 static void update_counter(struct k_work *work)
 {
 	obs_counter++;
-
 	if (resource_to_notify) {
 		coap_resource_notify(resource_to_notify);
 	}
@@ -348,7 +398,7 @@ static int send_notification_packet(const struct sockaddr *addr,
 
 	/* The response that coap-client expects */
 	r = snprintk((char *) payload, sizeof(payload),
-		     "%d\n", obs_counter);
+		     "%d\n", rx_frame.data[0]);
 	if (r < 0) {
 		goto end;
 	}
@@ -487,7 +537,6 @@ end:
 }
 
 static const char * const led_path[] = { "led", NULL };
-
 static const char * const obs_path[] = { "obs", NULL };
 static const char * const core_1_path[] = { "core1", NULL };
 static const char * const core_1_attributes[] = {
@@ -670,3 +719,7 @@ void main(void)
 quit:
 	LOG_ERR("Quit");
 }
+
+
+K_THREAD_DEFINE(odbieranko, STACKSIZE, receive, NULL, NULL, NULL,
+                PRIORITY, 0, 0);
