@@ -17,7 +17,6 @@ Najprawdopodobniej używając tych dwóch metod możemy bez problemu sterować R
 Do zrobienia:
 - przykład sprawnego klienta do tesów,
 - komunikacja CAN,
-- sprawdzić co się stanie pod odpięciu internetu,
 - sprawdzić czy da się subskrybowac bezterminowo
 
 

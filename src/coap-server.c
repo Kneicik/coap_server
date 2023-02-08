@@ -348,7 +348,7 @@ static int send_notification_packet(const struct sockaddr *addr,
 
 	/* The response that coap-client expects */
 	r = snprintk((char *) payload, sizeof(payload),
-		     "Counter: %d\n", obs_counter);
+		     "%d\n", obs_counter);
 	if (r < 0) {
 		goto end;
 	}

@@ -1,3 +1,5 @@
 main.c
 venv.sh
 backup.c
+build
+.vscode
