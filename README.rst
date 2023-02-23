@@ -8,16 +8,21 @@ Overview
 
 Testowy program do serwera CoAP dla drona ROV1.
 
-Program zawiera 2 rodzaje zapytania:
-/led metodą PUT można podając na payload 1 albo 0 zapalać i gasić diodę led (pisane z myślą o nucleo-f207zg ale powinno dać się wgrać na każdy inny devboard z ethernetem),
+Program zawiera 3 rodzaje zapytania:
+/thruster do obsługi silników z tyłu. Należy metodą PUT podać wartość 15 bitową ujemną lub dodatnią aby sterować mocą silników do przodu albo do tyłu.
+/level do obsługi silnika góra dół. sterownie jak wyżej.
 /obs metodą GET z subskrypcją. przykład wysyła zwiększający sie licznik. Dane można wysyłać bardzo szybko i powinno się idealnie nadać do naszego zastosoania.
 
-Najprawdopodobniej używając tych dwóch metod możemy bez problemu sterować ROV1. Da się obserwować parę rzeczy na raz a do tego wysyłać inne zapytania i wygląda na to, że wszystko funkcjonuje jak należy.
+Program komunikuje się przez CAN z płytką sterującą silnikami
+thrustery są na id 0x010 natomiast level jest na id 0x011
+ramka wygląda następująco:
+00 00 32 34 - gdzie pierwsze 2 bajty mogą mieć wartość albo same 0 albo F w przypadku gdy liczba jest ujemna a reszta to 15 bitowa wartość do sterowania mocą
 
 Do zrobienia:
 - przykład sprawnego klienta do tesów, - gotowe
-- komunikacja CAN,                     - gotowe
+- komunikacja CAN,                     - gotowe (sprawne obieranie i wysyłanie, poprawić odbieranie czyli odchudzić funkcjei i niepotrzebne funkcje)
 - sprawdzić czy da się subskrybowac bezterminowo
+- pingowanie klienta
 
 
 Building And Running

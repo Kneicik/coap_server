@@ -1,3 +1,9 @@
 {
-    "git.enabled": true
+    "git.enabled": true,
+    "files.associations": {
+        "stdio.h": "c",
+        "compare": "c",
+        "type_traits": "c",
+        "libc-header-start.h": "c"
+    }
 }

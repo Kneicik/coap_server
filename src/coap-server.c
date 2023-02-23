@@ -23,6 +23,7 @@ LOG_MODULE_REGISTER(net_coap_server_sample, LOG_LEVEL_DBG);
 #include <zephyr/net/socketcan.h>
 #include <zephyr/net/socketcan_utils.h>
 #include <zephyr/drivers/gpio.h>
+#include <stdio.h>
 
 #include "net_private.h"
 
@@ -37,14 +38,9 @@ LOG_MODULE_REGISTER(net_coap_server_sample, LOG_LEVEL_DBG);
 /* 1000 msec = 1 sec */
 #define SLEEP_TIME_MS   1000
 
-/* The devicetree node identifier for the "led0" alias. */
-#define LED0_NODE DT_ALIAS(led0)
+// #define LED0_NODE DT_ALIAS(led0)
 
-/*
- * A build error on this line means your board is unsupported.
- * See the sample documentation for information on how to fix this.
- */
-static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+// static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 #define ADDRLEN(sock) \
 	(((struct sockaddr *)sock)->sa_family == AF_INET ? \
@@ -61,8 +57,13 @@ static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 
 // CAN bus
 
-struct can_frame frame = {
+struct can_frame thruster_frame = {
         .id = 0x010,
+        .dlc = 8,
+};
+
+struct can_frame level_frame = {
+        .id = 0x011,
         .dlc = 8,
 };
 
@@ -92,11 +93,22 @@ while(1){
 }
 }
 
-void send_can(int data)
+void send_can(int data, struct can_frame frame)
 {
-	data = data-48;
   can_start(can_dev);
-  	frame.data[0] = data;
+  if(data < 0){
+	frame.data[0] = 255;
+	frame.data[1] = 255;
+	frame.data[2] = (uint8_t)(data >> 8);
+	frame.data[3] = (uint8_t)data;
+  }else{
+	frame.data[0] = 0;
+	frame.data[1] = 0;
+	frame.data[2] = (uint8_t)(data >> 8);
+	frame.data[3] = (uint8_t)data;
+  }
+
+	printk(" data: %d \n data hex: %x\n frame 0: %d\n frame 2: %d\n", data, data, frame.data[2],frame.data[3]);
     ret = can_send(can_dev, &frame, K_MSEC(100), NULL, NULL);
     if (ret != 0) {
             printk("Wysłanie pakietu CAN nie działa [%d]", ret);
@@ -112,7 +124,7 @@ static struct coap_pending pendings[NUM_PENDINGS];
 
 static struct k_work_delayable observer_work;
 
-static int obs_counter;
+//static int obs_counter;
 
 static struct coap_resource *resource_to_notify;
 
@@ -189,7 +201,7 @@ end:
 }
 
 
-static int led_put(struct coap_resource *resource,
+static int thruster_put(struct coap_resource *resource,
 		    struct coap_packet *request,
 		    struct sockaddr *addr, socklen_t addr_len)
 {
@@ -203,7 +215,8 @@ static int led_put(struct coap_resource *resource,
 	uint8_t tkl;
 	uint16_t id;
 	int r;
-	int ret = 0;
+	// int ret = 0;
+	int dane = 0;
 
 	code = coap_header_get_code(request);
 	type = coap_header_get_type(request);
@@ -218,24 +231,100 @@ static int led_put(struct coap_resource *resource,
 	if (payload) {
 		net_hexdump("PUT Payload", payload, payload_len);
 	}
-	send_can(*payload);
-	if (*payload == 49){
+ 	dane = atoi(payload);
+	send_can(dane, thruster_frame);
 
-		printk("payload: %d\n %d\n",*payload,payload_len);
-	if (!device_is_ready(led.port)) {
-		return ret;
-	}
+	// if (*payload == 49){
+	// 	//printk("payload: %x \n", *payload);
+	// if (!device_is_ready(led.port)) {
+	// 	return ret;
+	// }
 
-	ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	if (ret < 0) {
-		return ret;
-	}
-	} else{
-		if(*payload == 48){
-			gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
-		}
+	// ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+	// if (ret < 0) {
+	// 	return ret;
+	// }
+	// } else{
+	// 	if(*payload == 48){
+	// 		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+	// 	}
 		
+	// }
+	if (type == COAP_TYPE_CON) {
+		type = COAP_TYPE_ACK;
+	} else {
+		type = COAP_TYPE_NON_CON;
 	}
+
+	data = (uint8_t *)k_malloc(MAX_COAP_MSG_LEN);
+	if (!data) {
+		return -ENOMEM;
+	}
+
+	r = coap_packet_init(&response, data, MAX_COAP_MSG_LEN,
+			     COAP_VERSION_1, type, tkl, token,
+			     COAP_RESPONSE_CODE_CHANGED, id);
+	if (r < 0) {
+		goto end;
+	}
+
+	r = send_coap_reply(&response, addr, addr_len);
+
+end:
+	k_free(data);
+
+	return r;
+}
+
+static int level_put(struct coap_resource *resource,
+		    struct coap_packet *request,
+		    struct sockaddr *addr, socklen_t addr_len)
+{
+	struct coap_packet response;
+	uint8_t token[COAP_TOKEN_MAX_LEN];
+	const uint8_t *payload;
+	uint8_t *data;
+	uint16_t payload_len;
+	uint8_t code;
+	uint8_t type;
+	uint8_t tkl;
+	uint16_t id;
+	int r;
+	// int ret = 0;
+	int dane = 0;
+
+	code = coap_header_get_code(request);
+	type = coap_header_get_type(request);
+	id = coap_header_get_id(request);
+	tkl = coap_header_get_token(request, token);
+
+	LOG_INF("*******");
+	LOG_INF("type: %u code %u id %u", type, code, id);
+	LOG_INF("*******");
+
+	payload = coap_packet_get_payload(request, &payload_len);
+	if (payload) {
+		net_hexdump("PUT Payload", payload, payload_len);
+	}
+ 	dane = atoi(payload);
+	send_can(dane, level_frame);
+
+	// if (*payload == 49){
+	// 	//printk("payload: %x \n", *payload);
+	// if (!device_is_ready(led.port)) {
+	// 	return ret;
+	// }
+
+	// ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
+	// if (ret < 0) {
+	// 	return ret;
+	// }
+	// } else{
+	// 	if(*payload == 48){
+	// 		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
+	// 	}
+		
+	// }
 	if (type == COAP_TYPE_CON) {
 		type = COAP_TYPE_ACK;
 	} else {
@@ -311,11 +400,14 @@ static void retransmit_request(struct k_work *work)
 	schedule_next_retransmission();
 }
 
+int nothing;
+
 static void update_counter(struct k_work *work)
 {
-	obs_counter++;
+	// obs_counter++;
 	if (resource_to_notify) {
 		coap_resource_notify(resource_to_notify);
+		// resource_to_notify = nothing;
 	}
 
 	k_work_reschedule(&observer_work, K_SECONDS(0.1));
@@ -536,7 +628,8 @@ end:
 	return r;
 }
 
-static const char * const led_path[] = { "led", NULL };
+static const char * const thruster_path[] = { "thruster", NULL };
+static const char * const level_path[] = { "level", NULL };
 static const char * const obs_path[] = { "obs", NULL };
 static const char * const core_1_path[] = { "core1", NULL };
 static const char * const core_1_attributes[] = {
@@ -554,8 +647,11 @@ static struct coap_resource resources[] = {
 	{ .get = well_known_core_get,
 	  .path = COAP_WELL_KNOWN_CORE_PATH,
 	},
-	{ .put = led_put,
-	  .path = led_path,
+	{ .put = thruster_put,
+	  .path = thruster_path,
+	},
+	{ .put = level_put,
+	  .path = level_path,
 	},
 	{ .path = obs_path,
 	  .get = obs_get,
