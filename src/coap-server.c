@@ -41,6 +41,7 @@ LOG_MODULE_REGISTER(net_coap_server_sample, LOG_LEVEL_DBG);
 // #define LED0_NODE DT_ALIAS(led0)
 
 // static const struct gpio_dt_spec led = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
+const struct device *dev = DEVICE_DT_GET(DT_NODELABEL(gpiob));
 
 #define ADDRLEN(sock) \
 	(((struct sockaddr *)sock)->sa_family == AF_INET ? \
@@ -57,14 +58,19 @@ LOG_MODULE_REGISTER(net_coap_server_sample, LOG_LEVEL_DBG);
 
 // CAN bus
 
-struct can_frame thruster_frame = {
+struct can_frame thruster_left_frame = {
         .id = 0x010,
-        .dlc = 8,
+        .dlc = 4,
+};
+
+struct can_frame thruster_right_frame = {
+        .id = 0x011,
+        .dlc = 4,
 };
 
 struct can_frame level_frame = {
-        .id = 0x011,
-        .dlc = 8,
+        .id = 0x100,
+        .dlc = 4,
 };
 
 const struct can_filter my_filter = {
@@ -201,7 +207,7 @@ end:
 }
 
 
-static int thruster_put(struct coap_resource *resource,
+static int thruster_left_put(struct coap_resource *resource,
 		    struct coap_packet *request,
 		    struct sockaddr *addr, socklen_t addr_len)
 {
@@ -232,7 +238,7 @@ static int thruster_put(struct coap_resource *resource,
 		net_hexdump("PUT Payload", payload, payload_len);
 	}
  	dane = atoi(payload);
-	send_can(dane, thruster_frame);
+	send_can(dane, thruster_left_frame);
 
 	// if (*payload == 49){
 	// 	//printk("payload: %x \n", *payload);
@@ -276,6 +282,64 @@ end:
 	return r;
 }
 
+static int thruster_right_put(struct coap_resource *resource,
+		    struct coap_packet *request,
+		    struct sockaddr *addr, socklen_t addr_len)
+{
+	struct coap_packet response;
+	uint8_t token[COAP_TOKEN_MAX_LEN];
+	const uint8_t *payload;
+	uint8_t *data;
+	uint16_t payload_len;
+	uint8_t code;
+	uint8_t type;
+	uint8_t tkl;
+	uint16_t id;
+	int r;
+	int dane = 0;
+
+	code = coap_header_get_code(request);
+	type = coap_header_get_type(request);
+	id = coap_header_get_id(request);
+	tkl = coap_header_get_token(request, token);
+
+	LOG_INF("*******");
+	LOG_INF("type: %u code %u id %u", type, code, id);
+	LOG_INF("*******");
+
+	payload = coap_packet_get_payload(request, &payload_len);
+	if (payload) {
+		net_hexdump("PUT Payload", payload, payload_len);
+	}
+ 	dane = atoi(payload);
+	send_can(dane, thruster_right_frame);
+
+	if (type == COAP_TYPE_CON) {
+		type = COAP_TYPE_ACK;
+	} else {
+		type = COAP_TYPE_NON_CON;
+	}
+
+	data = (uint8_t *)k_malloc(MAX_COAP_MSG_LEN);
+	if (!data) {
+		return -ENOMEM;
+	}
+
+	r = coap_packet_init(&response, data, MAX_COAP_MSG_LEN,
+			     COAP_VERSION_1, type, tkl, token,
+			     COAP_RESPONSE_CODE_CHANGED, id);
+	if (r < 0) {
+		goto end;
+	}
+
+	r = send_coap_reply(&response, addr, addr_len);
+
+end:
+	k_free(data);
+
+	return r;
+}
+
 static int level_put(struct coap_resource *resource,
 		    struct coap_packet *request,
 		    struct sockaddr *addr, socklen_t addr_len)
@@ -290,7 +354,6 @@ static int level_put(struct coap_resource *resource,
 	uint8_t tkl;
 	uint16_t id;
 	int r;
-	// int ret = 0;
 	int dane = 0;
 
 	code = coap_header_get_code(request);
@@ -308,23 +371,6 @@ static int level_put(struct coap_resource *resource,
 	}
  	dane = atoi(payload);
 	send_can(dane, level_frame);
-
-	// if (*payload == 49){
-	// 	//printk("payload: %x \n", *payload);
-	// if (!device_is_ready(led.port)) {
-	// 	return ret;
-	// }
-
-	// ret = gpio_pin_configure_dt(&led, GPIO_OUTPUT_ACTIVE);
-	// if (ret < 0) {
-	// 	return ret;
-	// }
-	// } else{
-	// 	if(*payload == 48){
-	// 		gpio_pin_configure_dt(&led, GPIO_OUTPUT_INACTIVE);
-	// 	}
-		
-	// }
 	if (type == COAP_TYPE_CON) {
 		type = COAP_TYPE_ACK;
 	} else {
@@ -628,7 +674,8 @@ end:
 	return r;
 }
 
-static const char * const thruster_path[] = { "thruster", NULL };
+static const char * const thruster_left_path[] = { "thruster","left", NULL };
+static const char * const thruster_right_path[] = { "thruster","right", NULL };
 static const char * const level_path[] = { "level", NULL };
 static const char * const obs_path[] = { "obs", NULL };
 static const char * const core_1_path[] = { "core1", NULL };
@@ -647,8 +694,11 @@ static struct coap_resource resources[] = {
 	{ .get = well_known_core_get,
 	  .path = COAP_WELL_KNOWN_CORE_PATH,
 	},
-	{ .put = thruster_put,
-	  .path = thruster_path,
+	{ .put = thruster_left_put,
+	  .path = thruster_left_path,
+	},
+	{ .put = thruster_right_put,
+	  .path = thruster_right_path,
 	},
 	{ .put = level_put,
 	  .path = level_path,
@@ -779,10 +829,18 @@ static int process_client_request(void)
 	return 0;
 }
 
+
+
 void main(void)
 {
 	int r;
-
+	int en = 0;
+	if(en == 0){
+		// gpio_pin_configure(dev,11, GPIO_OUTPUT_INACTIVE);
+		// k_msleep(500);
+		// gpio_pin_configure(dev,11, GPIO_OUTPUT_ACTIVE);
+		en = 1;
+	}
 	LOG_DBG("Start CoAP-server sample");
 
 #if defined(CONFIG_NET_IPV6)

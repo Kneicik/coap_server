@@ -14,15 +14,16 @@ Program zawiera 3 rodzaje zapytania:
 /obs metodą GET z subskrypcją. przykład wysyła zwiększający sie licznik. Dane można wysyłać bardzo szybko i powinno się idealnie nadać do naszego zastosoania.
 
 Program komunikuje się przez CAN z płytką sterującą silnikami
-thrustery są na id 0x010 natomiast level jest na id 0x011
+thruster left i right są na id 0x010 natomiast level jest na id 0x011
 ramka wygląda następująco:
-00 00 32 34 - gdzie pierwsze 2 bajty mogą mieć wartość albo same 0 albo F w przypadku gdy liczba jest ujemna a reszta to 15 bitowa wartość do sterowania mocą
+00 00 32 34 - gdzie jest to albo dodatnia albo ujemna wartość 16 bitowa w hex
 
 Do zrobienia:
 - przykład sprawnego klienta do tesów, - gotowe
-- komunikacja CAN,                     - gotowe (sprawne obieranie i wysyłanie, poprawić odbieranie czyli odchudzić funkcjei i niepotrzebne funkcje)
+- komunikacja CAN,                     - gotowe
 - sprawdzić czy da się subskrybowac bezterminowo
 - pingowanie klienta
+- odzielne id na każdy silnik
 
 
 Building And Running
